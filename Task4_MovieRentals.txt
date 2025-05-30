@@ -1,0 +1,100 @@
+DROP DATABASE IF EXISTS MovieRental;
+CREATE DATABASE MovieRental;
+USE MovieRental;
+
+DROP TABLE IF EXISTS rental_data;
+DROP TABLE IF EXISTS movies;
+
+CREATE TABLE movies (
+    MOVIE_ID INT AUTO_INCREMENT,
+    MOVIE_NAME VARCHAR(100) NOT NULL,
+    GENRE VARCHAR(50) NOT NULL,
+    PRIMARY KEY (MOVIE_ID)
+);
+
+CREATE TABLE rental_data (
+    RENTAL_ID INT AUTO_INCREMENT,
+    MOVIE_ID INT,
+    CUSTOMER_ID INT NOT NULL,
+    RENTAL_DATE DATE NOT NULL,
+    RETURN_DATE DATE,
+    RENTAL_FEE DECIMAL(10,2) NOT NULL,
+    PRIMARY KEY (RENTAL_ID),
+    FOREIGN KEY (MOVIE_ID) REFERENCES movies(MOVIE_ID)
+);
+
+INSERT INTO movies (MOVIE_NAME, GENRE) VALUES
+    ('The Dark Knight', 'Action'),
+    ('Inception', 'Action'),
+    ('The Godfather', 'Drama'),
+    ('Pulp Fiction', 'Drama'),
+    ('The Matrix', 'Action'),
+    ('Titanic', 'Romance'),
+    ('The Shawshank Redemption', 'Drama'),
+    ('Jurassic Park', 'Action');
+
+INSERT INTO rental_data (MOVIE_ID, CUSTOMER_ID, RENTAL_DATE, RETURN_DATE, RENTAL_FEE) VALUES
+    (1, 101, '2024-03-01', '2024-03-03', 5.99),
+    (2, 102, '2024-03-05', '2024-03-07', 4.99),
+    (3, 103, '2024-04-01', '2024-04-03', 5.99),
+    (4, 104, '2024-04-10', '2024-04-12', 4.99),
+    (5, 105, '2024-04-15', '2024-04-17', 5.99),
+    (6, 106, '2024-05-01', '2024-05-03', 4.99),
+    (7, 107, '2024-05-05', '2024-05-07', 5.99),
+    (8, 112, '2024-05-28', '2024-05-30', 4.99);
+
+BEGIN;
+
+SELECT 'Genre and Movie Analysis' as Query, 
+    m.GENRE as Type,
+    COUNT(r.RENTAL_ID) as Rentals,
+    CONCAT('$', FORMAT(SUM(COALESCE(r.RENTAL_FEE, 0)), 2)) as Revenue
+FROM movies m
+LEFT JOIN rental_data r ON m.MOVIE_ID = r.MOVIE_ID
+GROUP BY m.GENRE;
+
+SELECT 'Monthly Revenue Analysis' as Query,
+    DATE_FORMAT(r.RENTAL_DATE, '%Y-%m') as Month,
+    m.GENRE as Genre,
+    COUNT(r.RENTAL_ID) as Rentals,
+    CONCAT('$', FORMAT(SUM(r.RENTAL_FEE), 2)) as Revenue
+FROM rental_data r
+JOIN movies m ON r.MOVIE_ID = m.MOVIE_ID
+GROUP BY DATE_FORMAT(r.RENTAL_DATE, '%Y-%m'), m.GENRE
+ORDER BY Month, Genre;
+
+SELECT 'Movie Performance Analysis' as Query,
+    m.MOVIE_NAME as Movie,
+    m.GENRE as Genre,
+    COUNT(r.RENTAL_ID) as Rentals,
+    CONCAT('$', FORMAT(SUM(COALESCE(r.RENTAL_FEE, 0)), 2)) as Revenue
+FROM movies m
+LEFT JOIN rental_data r ON m.MOVIE_ID = r.MOVIE_ID
+GROUP BY m.MOVIE_ID, m.MOVIE_NAME, m.GENRE
+ORDER BY SUM(COALESCE(r.RENTAL_FEE, 0)) DESC;
+
+SELECT 'Recent Rentals (Last 2 Months of Data)' as Query,
+    m.MOVIE_NAME as Movie,
+    m.GENRE as Genre,
+    DATE_FORMAT(r.RENTAL_DATE, '%Y-%m-%d') as RentalDate,
+    CONCAT('$', FORMAT(r.RENTAL_FEE, 2)) as Fee
+FROM rental_data r
+JOIN movies m ON r.MOVIE_ID = m.MOVIE_ID
+WHERE r.RENTAL_DATE >= (
+    SELECT DATE_SUB(MAX(RENTAL_DATE), INTERVAL 2 MONTH)
+    FROM rental_data
+)
+ORDER BY r.RENTAL_DATE DESC;
+
+SELECT 'Genre Performance Summary' as Query,
+    m.GENRE as Genre,
+    COUNT(DISTINCT m.MOVIE_ID) as TotalMovies,
+    COUNT(r.RENTAL_ID) as TotalRentals,
+    CONCAT('$', FORMAT(AVG(r.RENTAL_FEE), 2)) as AvgRentalFee,
+    CONCAT('$', FORMAT(SUM(r.RENTAL_FEE), 2)) as TotalRevenue
+FROM movies m
+LEFT JOIN rental_data r ON m.MOVIE_ID = r.MOVIE_ID
+GROUP BY m.GENRE
+ORDER BY SUM(COALESCE(r.RENTAL_FEE, 0)) DESC;
+
+COMMIT;
